@@ -32,7 +32,11 @@ if not st.session_state.authenticated:
 
     if st.session_state.attempts >= MAX_ATTEMPTS:
         st.error(
-            "🚫 Access denied. Please reach out to SparkMind Labs to obtain a valid access code."
+           if remaining == 0:
+    st.error("❌ The access code you entered is invalid. Please contact SparkMind Labs to request access.")
+else:
+    st.error(f"❌ The access code you entered is invalid. Attempts remaining: {remaining}")
+
         )
         st.stop()
 
