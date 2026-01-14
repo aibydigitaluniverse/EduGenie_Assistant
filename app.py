@@ -50,7 +50,7 @@ if not st.session_state.authenticated:
         if code_input == ACCESS_CODE:
             st.session_state.authenticated = True
             st.success("✅ Access verified! How can I help you today?")
-            st.experimental_rerun()
+            st.rerun()
         else:
             st.session_state.attempts += 1
             remaining = MAX_ATTEMPTS - st.session_state.attempts
