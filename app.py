@@ -2,10 +2,9 @@ import os
 import streamlit as st
 from openai import OpenAI
 import tempfile
+import base64
 
 from docx import Document
-from PIL import Image
-import pytesseract
 
 # -----------------------------
 # CONFIG
@@ -30,8 +29,8 @@ if "attempts" not in st.session_state:
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
-if "uploaded_text" not in st.session_state:
-    st.session_state.uploaded_text = ""
+if "image_context" not in st.session_state:
+    st.session_state.image_context = ""
 
 # -----------------------------
 # ACCESS CONTROL
@@ -62,19 +61,45 @@ if not st.session_state.authenticated:
     st.stop()
 
 # -----------------------------
-# IMAGE UPLOAD (PNG / JPG)
+# IMAGE UPLOAD (OPENAI VISION)
 # -----------------------------
 st.subheader("📷 Upload Image (Optional)")
-uploaded_file = st.file_uploader(
-    "Upload PNG or JPG image (student answer / notes / worksheet photo)",
+uploaded_image = st.file_uploader(
+    "Upload PNG or JPG (student answer / worksheet / notes)",
     type=["png", "jpg", "jpeg"]
 )
 
-if uploaded_file:
-    image = Image.open(uploaded_file)
-    extracted_text = pytesseract.image_to_string(image)
-    st.session_state.uploaded_text = extracted_text.strip()
-    st.success("🖼 Image uploaded and text extracted successfully.")
+if uploaded_image:
+    image_bytes = uploaded_image.read()
+    encoded_image = base64.b64encode(image_bytes).decode("utf-8")
+
+    vision_prompt = (
+        "Extract and summarize the educational content from this image. "
+        "If it is a student's answer, extract the answer clearly. "
+        "If it is a worksheet or notes, extract the text accurately."
+    )
+
+    vision_response = client.chat.completions.create(
+        model="gpt-4.1-mini",
+        messages=[
+            {
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": vision_prompt},
+                    {
+                        "type": "image_url",
+                        "image_url": {
+                            "url": f"data:image/jpeg;base64,{encoded_image}"
+                        },
+                    },
+                ],
+            }
+        ],
+    )
+
+    extracted_text = vision_response.choices[0].message.content
+    st.session_state.image_context = extracted_text
+    st.success("🖼 Image processed successfully using AI.")
 
 # -----------------------------
 # SYSTEM PROMPT
@@ -82,7 +107,7 @@ if uploaded_file:
 SYSTEM_PROMPT = """
 You are EduGenie Teacher Assistant.
 
-You support teachers with:
+You help teachers with:
 - Worksheets, quizzes, question papers
 - Lesson plans, unit plans
 - Student answer evaluation with feedback
@@ -90,15 +115,15 @@ You support teachers with:
 - Administrative tasks
 
 Rules:
-- Use clear, teacher-friendly language
-- Use headings, bullet points, and tables
+- Use simple, teacher-friendly language
+- Use headings, bullet points, tables
 - Always include answer keys where relevant
 - Keep output printable
 - Never mention AI
 - Do not store student data
 - No medical, legal, or psychological advice
 
-If reference content is provided from an uploaded image, use it as context.
+If image-based reference content is provided, use it as context.
 """
 
 # -----------------------------
@@ -127,8 +152,8 @@ def generate_word(text):
 if user_input:
     combined_input = user_input
 
-    if st.session_state.uploaded_text:
-        combined_input += "\n\nREFERENCE CONTENT FROM IMAGE:\n" + st.session_state.uploaded_text
+    if st.session_state.image_context:
+        combined_input += "\n\nREFERENCE CONTENT FROM IMAGE:\n" + st.session_state.image_context
 
     st.session_state.messages.append({"role": "user", "content": combined_input})
     st.chat_message("user").write(user_input)
