@@ -115,7 +115,9 @@ DEFAULT BEHAVIOR:
 - Use headings and bullet points
 - Keep outputs printable and concise
 - Include answer keys where relevant
-- DO NOT include rubrics unless explicitly requested
+- When generating worksheet or answer evaluations intended for document download,
+structure the output clearly in table format using rows and columns.
+Do not include rubrics unless explicitly requested.
 
 IMPORTANT RULES:
 - Never mention AI
@@ -139,12 +141,35 @@ user_input = st.chat_input("Ask EduGenie (worksheet, evaluation, lesson plan, et
 # -----------------------------
 def generate_word(text):
     doc = Document()
-    for line in text.split("\n"):
-        doc.add_paragraph(line)
+
+    lines = [line for line in text.split("\n") if "|" in line]
+
+    if lines:
+        rows = [line.split("|") for line in lines]
+        cols = len(rows[0])
+
+        table = doc.add_table(rows=1, cols=cols)
+        table.style = "Table Grid"
+
+        # Header
+        for i, cell in enumerate(rows[0]):
+            table.rows[0].cells[i].text = cell.strip()
+
+        # Data rows
+        for row in rows[1:]:
+            row_cells = table.add_row().cells
+            for i, cell in enumerate(row):
+                row_cells[i].text = cell.strip()
+
+    else:
+        # fallback: normal paragraph
+        for line in text.split("\n"):
+            doc.add_paragraph(line)
 
     tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".docx")
     doc.save(tmp.name)
     return tmp.name
+
 
 # -----------------------------
 # CHAT HANDLING
