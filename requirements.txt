@@ -1,6 +1,5 @@
 streamlit
 openai
-fpdf
-pytesseract
+python-docx
 pillow
-PyPDF2
+pytesseract
